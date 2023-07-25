@@ -1,3 +1,4 @@
+use dotenv::dotenv;
 use std::io::{self, Write};
 use std::net::{Ipv4Addr, UdpSocket};
 use std::num::ParseIntError;
@@ -24,6 +25,8 @@ struct Switch {
 }
 
 fn main() {
+    dotenv().ok();
+
     println!("Prosafe plus utility / Netgear Switch Discovery Protocol (NSDP) ");
 
     let socket = UdpSocket::bind("0.0.0.0:63321").unwrap();
@@ -84,32 +87,38 @@ fn main() {
                         let muc = socket.recv_from(&mut buf);
                         match muc {
                             Ok((number_of_bytes, src_addr)) => {
-                                let response = Response::build(&mut buf[..number_of_bytes]);
-                                switches.push(Switch {
-                                    name: response
-                                        .get_cmd(Cmd::CMD_Name)
-                                        .unwrap()
-                                        .try_into()
-                                        .unwrap(),
-                                    model: response
-                                        .get_cmd(Cmd::CMD_Model)
-                                        .unwrap()
-                                        .try_into()
-                                        .unwrap(),
-                                    location: response
-                                        .get_cmd(Cmd::CMD_Location)
-                                        .unwrap()
-                                        .try_into()
-                                        .unwrap(),
-                                    ipv4_address_reported: response
-                                        .get_cmd(Cmd::CMD_IPv4)
-                                        .unwrap()
-                                        .try_into()
-                                        .unwrap(),
+                                let response_try = Response::build(&mut buf[..number_of_bytes]);
 
-                                    ipv4_address: src_addr.to_string(),
-                                    mac_address: response.get_session().get_switch_mac(),
-                                });
+                                match response_try {
+                                    Ok(response) => {
+                                        switches.push(Switch {
+                                            name: response
+                                                .get_cmd(Cmd::CMD_Name)
+                                                .unwrap()
+                                                .try_into()
+                                                .unwrap(),
+                                            model: response
+                                                .get_cmd(Cmd::CMD_Model)
+                                                .unwrap()
+                                                .try_into()
+                                                .unwrap(),
+                                            location: response
+                                                .get_cmd(Cmd::CMD_Location)
+                                                .unwrap()
+                                                .try_into()
+                                                .unwrap(),
+                                            ipv4_address_reported: response
+                                                .get_cmd(Cmd::CMD_IPv4)
+                                                .unwrap()
+                                                .try_into()
+                                                .unwrap(),
+
+                                            ipv4_address: src_addr.to_string(),
+                                            mac_address: response.get_session().get_switch_mac(),
+                                        });
+                                    }
+                                    Err(_) => println!("Switch replied with invalid response"),
+                                }
                             }
                             Err(_) => {
                                 println!("No more replies. Found {} switches", switches.len());
@@ -123,14 +132,8 @@ fn main() {
                 2 => {
                     println!("Using thomas room switch");
 
-                    let switch = Switch {
-                        name: String::from("Thomas' Room Switch"),
-                        model: String::from("GS105Ev2"),
-                        location: String::from(""),
-                        ipv4_address_reported: Ipv4Addr::new(192, 168, 4, 231),
-                        ipv4_address: String::from("192.168.4.231:63322"),
-                        mac_address: [16, 218, 67, 30, 98, 1],
-                    };
+                    let switch = load_switch_from_dotenv();
+                    println!("loaded switch: {:?}", switch);
 
                     let login_tlv: (Cmd, u16, Vec<u8>) = (Cmd::CMD_Password, 8, password());
 
@@ -156,8 +159,11 @@ fn main() {
                         Ok((number_of_bytes, addr)) => {
                             let response = Response::build(&mut buf[..number_of_bytes]);
                             println!("Reponse: {:?}", response);
-                        },
-                        Err(_) => {println!("incorrect password or invalid address"); continue 'user_input;},
+                        }
+                        Err(_) => {
+                            println!("(timeout) incorrect password or invalid address");
+                            continue 'user_input;
+                        }
                     }
                 }
                 3 => {
@@ -201,4 +207,53 @@ fn print_hex(value: &Vec<u8>) {
     for byte in value {
         print!("{:02x} ", byte);
     }
+}
+
+fn load_switch_from_dotenv() -> Switch {
+    let name = std::env::var("TESTSWITCH_NAME").expect("TESTSWITCH_NAME not set");
+    let model = std::env::var("TESTSWITCH_MODEL").expect("TESTSWITCH_MODEL not set");
+    let location = std::env::var("TESTSWITCH_LOCATION").expect("TESTSWITCH_LOCATION not set");
+    let ipv4_address_reported: Ipv4Addr = Ipv4Addr::from(
+        <Vec<u8> as TryInto<[u8; 4]>>::try_into(csv_to_byte_array(
+            std::env::var("TESTSWITCH_IPV4_REPORTED")
+                .expect("TESTSWITCH_IPV4_REPORTED not set")
+                .as_str(),
+        ))
+        .unwrap(),
+    );
+    let ipv4_address = std::env::var("TESTSWITCH_IPV4").expect("TESTSWITCH_IPV4 not set");
+    let mac_address: [u8; 6] = csv_to_byte_array(
+        std::env::var("TESTSWITCH_MAC")
+            .expect("TESTSWITCH_MAC not set")
+            .as_str(),
+    )
+    .try_into()
+    .unwrap();
+
+    Switch {
+        name,
+        model,
+        location,
+        ipv4_address_reported,
+        ipv4_address,
+        mac_address,
+    }
+}
+
+fn csv_to_byte_array(str: &str) -> Vec<u8> {
+    let comma_ascii: char = char::from_u32(",".as_bytes()[0] as u32).unwrap();
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut start = 0;
+    let mut end = 0;
+    for char in str.chars() {
+        if char == comma_ascii {
+            let num: u8 = str[start..end].parse().unwrap();
+            bytes.push(num);
+            start = end + 1;
+        }
+        end += 1;
+    }
+    let num: u8 = str[start..end].parse().unwrap();
+    bytes.push(num);
+    bytes.try_into().unwrap()
 }

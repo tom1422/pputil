@@ -11,7 +11,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn build(msg: &[u8]) -> Response {
+    pub fn build(msg: &[u8]) -> Result<Response, TLVReadingError> {
         let ctype: [u8; 2] = msg[0..2].try_into().unwrap();
         //2 to 8 is reserved
         let source_mac: [u8; 6] = msg[8..14].try_into().unwrap();
@@ -32,8 +32,8 @@ impl Response {
                     cmds.push(tlv);
                 }
                 Err(error) => match error {
-                    TLVReadingError::ArrTooShort(message) => {
-                        panic!("Error reading TLV {}", message)
+                    TLVReadingError::ArrTooShort(_) => {
+                        return Err(error);
                     }
                     TLVReadingError::EndOfMessage => break,
                     _ => {},
@@ -41,11 +41,11 @@ impl Response {
             }
         }
 
-        Response {
+        Ok(Response {
             cmds,
             ctype,
             session: Session::new(source_mac, dest_mac, seq),
-        }
+        })
     }
 
     pub fn get_session(&self) -> &Session {
