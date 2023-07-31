@@ -33,7 +33,7 @@ impl Session {
 
 #[derive(Debug, PartialEq)]
 pub struct Request {
-    cmds: Vec<Vec<u8>>,
+    cmds: Vec<TypeLengthValue>,
     ctype: [u8; 2],
 
     session: Session, //Persistent details
@@ -64,7 +64,7 @@ impl Request {
         vec.append(&mut head.to_vec());
 
         for cmd in self.cmds.iter() {
-            vec.append(&mut cmd.clone());
+            vec.append(&mut cmd.to_raw());
         }
 
         vec.append(&mut Vec::from(self.end_of_msg));
@@ -75,7 +75,7 @@ impl Request {
 
 #[derive(Default)]
 pub struct RequestBuilder {
-    cmds: Vec<Vec<u8>>,
+    cmds: Vec<TypeLengthValue>,
     session: Option<Session>,
     ctype: Option<[u8; 2]>,
 }
@@ -95,7 +95,7 @@ impl RequestBuilder {
     }
 
     pub fn add_cmd(mut self, cmd: TypeLengthValue) -> RequestBuilder {
-        self.cmds.push(cmd.to_raw());
+        self.cmds.push(cmd);
         self
     }
 

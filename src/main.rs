@@ -122,7 +122,7 @@ fn user_input_loop(socket: &UdpSocket) -> bool {
 
             let switch = load_switch_from_dotenv();
 
-            let login_tlv = TypeLengthValue::from((Cmd::CMD_Password, 8, password()));
+            let login_tlv = TypeLengthValue::from((Cmd::CMD_Password, password()));
 
             perform_action(&socket, switch, login_tlv);
         }

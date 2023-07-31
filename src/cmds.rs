@@ -8,11 +8,12 @@ pub enum Cmd {
 
     CMD_Model,
     CMD_Name,
+    CMD_Switch_MAC,
     CMD_Location,
     CMD_IPv4,
+    CMD_Switch_Netmask,
 
-    CMD_Unknown_0014,
-    CMD_Unknown_6000,
+    
 
     CMD_Password,
 
@@ -22,6 +23,31 @@ pub enum Cmd {
 
     MACBroadcast,
     MACMyPC,
+    CMD_Switch_Gateway,
+    CMD_Switch_DHCP,
+    CMD_FW_Version,
+    CMD_FW_Version_2,
+    CMD_FW_Active,
+    CMD_Port_Count,
+    CMD_0002,
+    CMD_000C,
+    CMD_0014,
+    CMD_7C00,
+    CMD_7400,
+    CMD_0C00,
+    CMD_7800,
+    CMD_1000,
+    CMD_5C00,
+    CMD_2000,
+    CMD_6800,
+    CMD_6C00,
+    CMD_7000,
+    CMD_9000,
+    CMD_6400,
+    CMD_3400,
+    CMD_5000,
+    CMD_4C00,
+    CMD_5400,
 }
 
 impl Cmd {
@@ -33,14 +59,47 @@ impl Cmd {
             Cmd::TransmitResponse => &[0x10, 0x04],
 
             Cmd::CMD_Model => &[0x00, 0x01],
+            Cmd::CMD_0002 => &[0x00, 0x02],
             Cmd::CMD_Name => &[0x00, 0x03],
+            Cmd::CMD_Switch_MAC => &[0x00, 0x04],
             Cmd::CMD_Location => &[0x00, 0x05],
             Cmd::CMD_IPv4 => &[0x00, 0x06],
-
-            Cmd::CMD_Unknown_0014 => &[0x00, 0x14],
-            Cmd::CMD_Unknown_6000 => &[0x60, 0x00], //Usually returned with TLV length of 1 (Possibly port count)
-
+            Cmd::CMD_Switch_Netmask => &[0x00, 0x07],
+            Cmd::CMD_Switch_Gateway => &[0x00, 0x08],
             Cmd::CMD_Password => &[0x00, 0x0a],
+            Cmd::CMD_Switch_DHCP => &[0x00, 0x0b],
+            Cmd::CMD_000C => &[0x00, 0x0c],
+            Cmd::CMD_FW_Version => &[0x00, 0x0d],
+            Cmd::CMD_FW_Version_2 => &[0x00, 0x0e],
+            Cmd::CMD_FW_Active => &[0x00, 0x0f],
+
+            Cmd::CMD_0014 => &[0x00, 0x14],             //Usually 4 bytes like 00 00 00 01 
+
+            Cmd::CMD_0C00 => &[0x0C, 0x00],             //Response: n copies of 3 byte TLVs where n is port count
+            Cmd::CMD_1000 => &[0x10, 0x00],             //Response: n copies of 49 byte TLVs where n is port count
+
+            Cmd::CMD_2000 => &[0x20, 0x00],             //Usually 1 byte like 00
+
+            Cmd::CMD_3400 => &[0x34, 0x00],             //Usually 1 byte like 02
+
+            Cmd::CMD_4C00 => &[0x4c, 0x00],             //Response: n copies of 5 byte TLVs where n is port count
+
+            Cmd::CMD_5000 => &[0x50, 0x00],             //Response: n copies of 5 byte TLVs where n is port count
+            Cmd::CMD_5400 => &[0x54, 0x00],             //Usually 1 byte like 00
+            Cmd::CMD_5C00 => &[0x5c, 0x00],             //Usually 3 bytes like 00 00 00
+
+            Cmd::CMD_Port_Count => &[0x60, 0x00],
+
+            Cmd::CMD_6400 => &[0x64, 0x00],             //Usually 2 bytes like 00 20
+            Cmd::CMD_6800 => &[0x68, 0x00],             //Usually 4 bytes like 00 01 00 01
+            Cmd::CMD_6C00 => &[0x6C, 0x00],             //Usually 1 byte like 00
+
+            Cmd::CMD_7000 => &[0x70, 0x00],             //Usually 1 byte like 00
+            Cmd::CMD_7400 => &[0x74, 0x00],             //Usually 8 bytes like 00 00 00 08 7f fc ff ff
+            Cmd::CMD_7800 => &[0x78, 0x00],             //Usually 21 bytes like 01 30 30 31 31 31 31 31 31 31 31 31 31 31 00 00 1 20 10 00 a2
+            Cmd::CMD_7C00 => &[0x7c, 0x00],             //Usually 1 byte like 01
+
+            Cmd::CMD_9000 => &[0x90, 0x00],             //Usually 1 byte like 00
 
             Cmd::NDSP => &[0x4E, 0x53, 0x44, 0x50],
             Cmd::Reserved => &[0x00, 0x00],
@@ -97,6 +156,16 @@ impl From<(Cmd, u16, Vec<u8>)> for TypeLengthValue {
         Self {
             cmd: cmd_enum.value().try_into().unwrap(),
             len,
+            value: value,
+        }
+    }
+}
+
+impl From<(Cmd, Vec<u8>)> for TypeLengthValue {
+    fn from((cmd_enum, value): (Cmd, Vec<u8>)) -> Self {
+        Self {
+            cmd: cmd_enum.value().try_into().unwrap(),
+            len: value.len() as u16,
             value: value,
         }
     }
