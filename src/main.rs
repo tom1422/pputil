@@ -1,6 +1,7 @@
+use clap::Parser;
 use dotenv::dotenv;
 use std::io::{self, Write};
-use std::net::{Ipv4Addr, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::num::ParseIntError;
 
 use std::time::Duration;
@@ -9,12 +10,13 @@ use crate::cmds::{Cmd, TypeLengthValue};
 use crate::request::Session;
 use crate::response::Response;
 
+mod actions;
 mod cmds;
 mod request;
 mod response;
 
 #[derive(Debug)]
-struct Switch {
+pub struct Switch {
     name: String,
     model: String,
     location: String,
@@ -34,153 +36,111 @@ fn main() {
     socket
         .set_broadcast(true)
         .expect("set_broadcast call failed");
-
     let read_timeout_ms = 500;
     socket
         .set_read_timeout(Some(Duration::from_millis(read_timeout_ms)))
         .unwrap();
 
+    while user_input_loop(&socket) {}
+
+    lifetime_test();
+}
+
+fn user_input_loop(socket: &UdpSocket) -> bool {
     let mut switches: Vec<Switch> = Vec::new();
 
-    'user_input: loop {
-        println!("Please choose from the following options:");
-        println!("0: Exit");
-        println!("1: Discover switches");
-        println!("2: Select discovered switch");
-        println!("3: Test feature");
-        print!("Enter option: ");
-        io::stdout().flush().unwrap();
-        let mut input = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
-        let option: Result<i32, ParseIntError> = input.trim().parse();
-        match option {
-            Ok(option) => match option {
-                0 => {
-                    println!("exiting");
-                    break 'user_input;
-                }
-                1 => {
-                    let request = request::Request::builder()
-                        .ctype(cmds::Cmd::QueryRequest.value().try_into().unwrap())
-                        .session(Session::new_random_seq(
-                            cmds::Cmd::MACMyPC.value().try_into().unwrap(),
-                            cmds::Cmd::MACBroadcast.value().try_into().unwrap(),
-                        ))
-                        .add_cmd(TypeLengthValue::from(Cmd::CMD_Name))
-                        .add_cmd(TypeLengthValue::from(Cmd::CMD_Model))
-                        .add_cmd(TypeLengthValue::from(Cmd::CMD_Location))
-                        .add_cmd(TypeLengthValue::from(Cmd::CMD_IPv4))
-                        .build();
+    println!("Please choose from the following options:");
+    println!("0: Exit");
+    println!("1: Discover switches");
+    println!("2: Perform action on discovered switch");
+    println!("3: Test feature");
+    print!("Enter option: ");
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read line");
+    let option: i32 = input.trim().parse().expect("Invalid integer");
 
-                    let buf = request.format();
+    match option {
+        0 => return false,
+        1 => {
+            let request = request::Request::builder()
+                .ctype(cmds::Cmd::QueryRequest.value().try_into().unwrap())
+                .session(Session::new_random_seq(
+                    cmds::Cmd::MACMyPC.value().try_into().unwrap(),
+                    cmds::Cmd::MACBroadcast.value().try_into().unwrap(),
+                ))
+                .add_cmd(TypeLengthValue::from(Cmd::CMD_Name))
+                .add_cmd(TypeLengthValue::from(Cmd::CMD_Model))
+                .add_cmd(TypeLengthValue::from(Cmd::CMD_Location))
+                .add_cmd(TypeLengthValue::from(Cmd::CMD_IPv4))
+                .build();
 
-                    socket
-                        .send_to(buf.as_slice(), "255.255.255.255:63322")
-                        .unwrap();
+            let buf = request.format();
 
-                    let discover_count = 6;
+            socket
+                .send_to(buf.as_slice(), "255.255.255.255:63322")
+                .unwrap();
 
-                    for _ in 0..discover_count {
-                        let mut buf = [0; 128];
-                        let muc = socket.recv_from(&mut buf);
-                        match muc {
-                            Ok((number_of_bytes, src_addr)) => {
-                                let response_try = Response::build(&mut buf[..number_of_bytes]);
+            let discover_count = 6;
 
-                                match response_try {
-                                    Ok(response) => {
-                                        switches.push(Switch {
-                                            name: response
-                                                .get_cmd(Cmd::CMD_Name)
-                                                .unwrap()
-                                                .try_into()
-                                                .unwrap(),
-                                            model: response
-                                                .get_cmd(Cmd::CMD_Model)
-                                                .unwrap()
-                                                .try_into()
-                                                .unwrap(),
-                                            location: response
-                                                .get_cmd(Cmd::CMD_Location)
-                                                .unwrap()
-                                                .try_into()
-                                                .unwrap(),
-                                            ipv4_address_reported: response
-                                                .get_cmd(Cmd::CMD_IPv4)
-                                                .unwrap()
-                                                .try_into()
-                                                .unwrap(),
+            for _ in 0..discover_count {
+                let mut buf = [0; 128];
 
-                                            ipv4_address: src_addr.to_string(),
-                                            mac_address: response.get_session().get_switch_mac(),
-                                        });
-                                    }
-                                    Err(_) => println!("Switch replied with invalid response"),
-                                }
-                            }
-                            Err(_) => {
-                                println!("No more replies. Found {} switches", switches.len());
-                                break;
-                            }
-                        }
-                    }
+                if let Ok((number_of_bytes, src_addr)) = socket.recv_from(&mut buf) {
+                    if let Ok(response) = Response::build(&mut buf[..number_of_bytes]) {
+                        switches.push(Switch {
+                            name: response.get_cmd(Cmd::CMD_Name).unwrap().try_into().unwrap(),
+                            model: response
+                                .get_cmd(Cmd::CMD_Model)
+                                .unwrap()
+                                .try_into()
+                                .unwrap(),
+                            location: response
+                                .get_cmd(Cmd::CMD_Location)
+                                .unwrap()
+                                .try_into()
+                                .unwrap(),
+                            ipv4_address_reported: response
+                                .get_cmd(Cmd::CMD_IPv4)
+                                .unwrap()
+                                .try_into()
+                                .unwrap(),
 
-                    println!("Final switches array: {:?}", switches);
-                }
-                2 => {
-                    println!("Using thomas room switch");
-
-                    let switch = load_switch_from_dotenv();
-                    println!("loaded switch: {:?}", switch);
-
-                    let login_tlv: (Cmd, u16, Vec<u8>) = (Cmd::CMD_Password, 8, password());
-
-                    let request = request::Request::builder()
-                        .ctype(cmds::Cmd::TransmitRequest.value().try_into().unwrap())
-                        .session(Session::new_random_seq(
-                            cmds::Cmd::MACMyPC.value().try_into().unwrap(),
-                            switch.mac_address,
-                        ))
-                        .add_cmd(TypeLengthValue::from(login_tlv))
-                        .build();
-
-                    let buf = request.format();
-
-                    socket
-                        .send_to(buf.as_slice(), "255.255.255.255:63322")
-                        .unwrap();
-
-                    let mut buf = [0; 128];
-                    let resp = socket.recv_from(&mut buf);
-
-                    match resp {
-                        Ok((number_of_bytes, addr)) => {
-                            let response = Response::build(&mut buf[..number_of_bytes]);
-                            println!("Reponse: {:?}", response);
-                        }
-                        Err(_) => {
-                            println!("(timeout) incorrect password or invalid address");
-                            continue 'user_input;
-                        }
+                            ipv4_address: src_addr.to_string(),
+                            mac_address: response.get_session().get_switch_mac(),
+                        });
                     }
                 }
-                3 => {
-                    println!("Debug test message");
-                    password_test();
-                }
-                _ => {
-                    println!("Invalid option selected!");
-                    continue 'user_input;
-                }
-            },
-            Err(_) => {
-                println!("Failed to parse input as valid integer");
-                continue 'user_input;
             }
+
+            println!("Final switches array: {:?}", switches);
+        }
+        2 => {
+            println!("Using switch loaded in ENV file!");
+
+            let switch = load_switch_from_dotenv();
+
+            let login_tlv = TypeLengthValue::from((Cmd::CMD_Password, 8, password()));
+
+            perform_action(&socket, switch, login_tlv);
+        }
+        3 => {
+            println!("Debug test message");
+            password_test();
+        }
+        _ => {
+            println!("Invalid option selected!");
         }
     }
+    true
+}
+
+fn perform_action(socket: &UdpSocket, switch: Switch, login_tlv: TypeLengthValue) {
+    let action = actions::ActionRunner::new(socket, &switch);
+
+    action.get_all_info(&login_tlv);
 }
 
 fn password() -> Vec<u8> {
@@ -256,4 +216,23 @@ fn csv_to_byte_array(str: &str) -> Vec<u8> {
     let num: u8 = str[start..end].parse().unwrap();
     bytes.push(num);
     bytes.try_into().unwrap()
+}
+
+fn lifetime_test() {
+    let str1 = String::from("Longer string");
+    let str2 = String::from("Short");
+    let longer;
+    {
+        longer = test_2(&str1, &str2);
+    }
+
+    println!("Invalid! {}", longer);
+}
+
+fn test_2<'a>(st: &'a str, sl: &'a str) -> &'a str {
+    if st.len() > sl.len() {
+        st
+    } else {
+        sl
+    }
 }

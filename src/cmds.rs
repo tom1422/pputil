@@ -11,7 +11,8 @@ pub enum Cmd {
     CMD_Location,
     CMD_IPv4,
 
-    CMD_Unknown,
+    CMD_Unknown_0014,
+    CMD_Unknown_6000,
 
     CMD_Password,
 
@@ -36,7 +37,8 @@ impl Cmd {
             Cmd::CMD_Location => &[0x00, 0x05],
             Cmd::CMD_IPv4 => &[0x00, 0x06],
 
-            Cmd::CMD_Unknown => &[0x00, 0x14],
+            Cmd::CMD_Unknown_0014 => &[0x00, 0x14],
+            Cmd::CMD_Unknown_6000 => &[0x60, 0x00], //Usually returned with TLV length of 1 (Possibly port count)
 
             Cmd::CMD_Password => &[0x00, 0x0a],
 
