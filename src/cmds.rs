@@ -114,9 +114,9 @@ const fn u32(arr: [u8; 2]) -> u32 {
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub struct CmdAttributes: u32 {
-        const READ_ONLY = 0x00001111;
-        const WRITE_ONLY = 0x01001111;
-        const READ_WRITE = 0x10001111;
+        const READ_ONLY = (0b0000000000000000 as u32) << 16 | 0x0000FFFF;
+        const WRITE_ONLY = (0b0000000000000001 as u32) << 16 | 0x0000FFFF;
+        const READ_WRITE = (0b0000000000000010 as u32) << 16 | 0x0000FFFF;
     }
 }
 
