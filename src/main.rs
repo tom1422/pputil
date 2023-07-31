@@ -66,10 +66,10 @@ fn user_input_loop(socket: &UdpSocket) -> bool {
         0 => return false,
         1 => {
             let request = request::Request::builder()
-                .ctype(cmds::Cmd::QueryRequest.value().try_into().unwrap())
+                .ctype(cmds::ProtoConsts::QueryRequest.value().try_into().unwrap())
                 .session(Session::new_random_seq(
-                    cmds::Cmd::MACMyPC.value().try_into().unwrap(),
-                    cmds::Cmd::MACBroadcast.value().try_into().unwrap(),
+                    cmds::ProtoConsts::MACMyPC.value().try_into().unwrap(),
+                    cmds::ProtoConsts::MACBroadcast.value().try_into().unwrap(),
                 ))
                 .add_cmd(TypeLengthValue::from(Cmd::CMD_Name))
                 .add_cmd(TypeLengthValue::from(Cmd::CMD_Model))
@@ -91,19 +91,19 @@ fn user_input_loop(socket: &UdpSocket) -> bool {
                 if let Ok((number_of_bytes, src_addr)) = socket.recv_from(&mut buf) {
                     if let Ok(response) = Response::build(&mut buf[..number_of_bytes]) {
                         switches.push(Switch {
-                            name: response.get_cmd(Cmd::CMD_Name).unwrap().try_into().unwrap(),
+                            name: response.get_cmd(&Cmd::CMD_Name).unwrap().try_into().unwrap(),
                             model: response
-                                .get_cmd(Cmd::CMD_Model)
+                                .get_cmd(&Cmd::CMD_Model)
                                 .unwrap()
                                 .try_into()
                                 .unwrap(),
                             location: response
-                                .get_cmd(Cmd::CMD_Location)
+                                .get_cmd(&Cmd::CMD_Location)
                                 .unwrap()
                                 .try_into()
                                 .unwrap(),
                             ipv4_address_reported: response
-                                .get_cmd(Cmd::CMD_IPv4)
+                                .get_cmd(&Cmd::CMD_IPv4)
                                 .unwrap()
                                 .try_into()
                                 .unwrap(),

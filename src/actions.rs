@@ -1,7 +1,9 @@
 use std::net::{UdpSocket, SocketAddr};
 
+use strum::IntoEnumIterator;
+
 use crate::{
-    cmds::{self, TypeLengthValue, Cmd},
+    cmds::{self, TypeLengthValue, Cmd, CmdAttributes},
     request::{self, Session},
     Switch, response::Response,
 };
@@ -23,26 +25,21 @@ impl<'a> ActionRunner<'a> {
 
         //Get actual info
 
-        let request = request::Request::builder()
-            .ctype(cmds::Cmd::QueryRequest.value().try_into().unwrap())
+        let mut request_builder = request::Request::builder()
+            .ctype(cmds::ProtoConsts::QueryRequest.value().try_into().unwrap())
             .session(Session::new_random_seq(
-                cmds::Cmd::MACMyPC.value().try_into().unwrap(),
+                cmds::ProtoConsts::MACMyPC.value().try_into().unwrap(),
                 self.switch.mac_address,
-            ))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Model))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_0002))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Name))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Switch_MAC))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Location))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_IPv4))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Switch_Netmask))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Switch_Gateway))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_Switch_DHCP))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_000C))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_FW_Version))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_FW_Version_2))
-            .add_cmd(TypeLengthValue::from(Cmd::CMD_FW_Active))
-            .build();
+            ));
+
+        for cmd in Cmd::iter() {
+            if cmd.is_flag_set(CmdAttributes::READ_ONLY) {
+                request_builder = request_builder.add_cmd(TypeLengthValue::from(cmd));
+            }
+        }
+
+        let request = request_builder.build();
+            
 
         println!("Request: {:?}", request);
 
@@ -67,9 +64,9 @@ impl<'a> ActionRunner<'a> {
 
     fn login(&self, password: &TypeLengthValue) -> Result<Response, std::io::Error> {
         let request = request::Request::builder()
-            .ctype(cmds::Cmd::TransmitRequest.value().try_into().unwrap())
+            .ctype(cmds::ProtoConsts::TransmitRequest.value().try_into().unwrap())
             .session(Session::new_random_seq(
-                cmds::Cmd::MACMyPC.value().try_into().unwrap(),
+                cmds::ProtoConsts::MACMyPC.value().try_into().unwrap(),
                 self.switch.mac_address,
             ))
             .add_cmd(password.clone())

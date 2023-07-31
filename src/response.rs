@@ -56,9 +56,9 @@ impl Response {
         &self.cmds
     }
 
-    pub fn get_cmd(&self, cmd: Cmd) -> Result<TypeLengthValue, String> {
+    pub fn get_cmd(&self, cmd: &Cmd) -> Result<TypeLengthValue, String> {
         for a in &self.cmds {
-            if a.cmd_equal_to(&cmd) {
+            if a.cmd_equal_to(cmd) {
                 return Ok(a.clone());
             }
         }

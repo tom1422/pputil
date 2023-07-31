@@ -109,9 +109,9 @@ impl RequestBuilder {
             cmds: self.cmds,
             ctype: self.ctype.expect("CType must be provided!"),
             session: self.session.expect("Session information must be provided!"),
-            nsdp: crate::cmds::Cmd::NDSP.value()[0..4].try_into().unwrap(),
-            reserved: crate::cmds::Cmd::Reserved.value()[0..2].try_into().unwrap(),
-            end_of_msg: crate::cmds::Cmd::EndOfMessage.value()[0..4]
+            nsdp: crate::cmds::ProtoConsts::NDSP.value()[0..4].try_into().unwrap(),
+            reserved: crate::cmds::ProtoConsts::Reserved.value()[0..2].try_into().unwrap(),
+            end_of_msg: crate::cmds::ProtoConsts::EndOfMessage.value()[0..4]
                 .try_into()
                 .unwrap(),
         }
